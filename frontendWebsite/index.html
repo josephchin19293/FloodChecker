@@ -11,29 +11,175 @@
         <!-- Chartist links-->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.0/chartist.min.css">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.0/chartist.js"></script>
+        <!-- jQuery nstuff -->
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+
+        <!-- require.js -->
+        <!-- <script src="node_modules/mock-xmlhttprequest/index.js"></script> -->
+        <script src = "node_modules/clientside-require/dist/bundle.js"></script>
+        <script src="../scripts/floodWarn.js"></script>
+
+        </script>
         <title>Home</title>
     </head>
     <body>
-        <div w3-include-html="header.html"></div>
+      <div w3-include-html="header.html"></div>
         <div class='container' style='margin-top: 80px;margin-bottom: 90px'>
             <div class='jumbotron'>
-                <h1 class="display-d">Data visualisation</h1>
+                <h1 class="display-d" alt='Data visualisation'>Data visualisation</h1>
             </div>
+
+            <div class="postcode-search" alt='Postcode search'>
+              <form id="search-form" alt='Postcode search form'>
+                <input type="text" name="" id="postcode" placeholder="Postcode" alt='Input postcode for search'>
+                <button type="button" id="search" name="button" alt='Button to complete postcode search'>Search</button>
+              </form>
             
+
+
+        <div id="map" style="width:100%;height:650px" alt='Map shows the different markers for both flood warnings and sensors that have been placed to track levels of water.'></div>
+        <div alt='A section that shows the server status of the different dependencies for the map.'>
+          <h1>Server status</h1>
+          <div>
+            <div id='flood_monitoring_server' class='row' alt='Shows the status and name for the flood warning server'>
+              <div class='col-md-4'>
+                  <div class="alert alert-secondary" role="alert" alt='Title for the flood warning server'>
+                      Flood monitoring server :
+                    </div>
+                
+              </div>
+              <div class='col-md-8'>
+                  <div class="alert alert-danger" role="alert" alt='Status of the flood warning server'>
+                      Unresponsive
+                    </div>
+              </div>
+            </div>
+            <div id='sensor_dependencies' class='row' alt='Shows the status and name for the sensor data'>
+                <div class='col-md-4'>
+                <div class="alert alert-secondary" role="alert" alt='Title for the sensor data'>
+                    Sensor data :
+                  </div>
+              
+            </div>
+            <div class='col-md-8'>
+                <div class="alert alert-danger" role="alert" alt='Status for the sensor data'>
+                    Unresponsive
+                  </div>
+            </div>
+            </div>
+          </div>
+        </div>
+        <div class="ct-chart ct-perfect-fourth" alt='Shows a chart containing the data for the sensors water level'></div>
         
-        <div id="map" style="width:100%;height:650px"></div>
-        <div class="ct-chart ct-perfect-fourth"></div>
-        
+
     <script>
-      var map;  
+      var floodWarn = new floodWarn();
+
+      var isTest = false;
+      var map;
       var jsonData;
       var currentSensorOpen = null;
       var markers = [];
+      var floodMarkers = [];
       var currentMarker;
       var infowindow;
       var timer;
+      var floodData;
+      var floodLocData = [];
+      var xhr = new XMLHttpRequest();
+      var searchMarker = null;
+      var searchCircle = null;
+      var floodServerActive = false;
+      var sensorDataActive = false;
+
+      
+
+      function queryFloodData() {
+        const url = 'http://environment.data.gov.uk/flood-monitoring/id/floods';
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+          if(this.readyState==4 && this.status==200) {
+            floodData = JSON.parse(xhr.responseText).items;
+            if(floodServerActive == false) {
+              floodServerActive = true;
+              changeFloodServer();
+            }
+          } else {
+            if(floodServerActive == true) {
+              floodServerActive = false;
+              changeFloodServer();
+            }
+          }
+        }
+        xhr.open("GET", url, false);
+        xhr.send();
+
+        // Listing through all the floods
+        for(var i=0; i < floodData.length; i++) {
+          // Finding individual urls for each flood warning
+          // for extra data
+          var flood_url = floodData[i]['@id'];
+          xhttp = new XMLHttpRequest();
+          xhttp.onreadystatechange = function() {
+            if(this.readyState == 4 && this.status == 200) {
+                locInfo = JSON.parse(this.responseText);
+                var sev = floodData[i]['severityLevel'];
+                var title = floodData[i]['title'];
+                var message = floodData[i]['message'];
+                // Makes the tuple used for each floodwarning marker
+                floodLoc = {
+                  sev: sev,
+                  title: title,
+                  message: message,
+                  lat: locInfo.items.floodArea.lat,
+                  long: locInfo.items.floodArea.long
+                };
+                // Adds the tuple to the list of flood warnings
+                floodLocData.push(floodLoc);
+            }
+          }
+          xhttp.open("GET", flood_url, false);
+          xhttp.send();
+        }
+        console.log(floodData);
+        console.log(floodLocData);
+
+        // get test data from session data
+        var testData = JSON.parse(sessionStorage.getItem('testData'))
+        console.log(testData);
+        // sets new Flood Warning markers
+        if(testData == null) {
+          floodMarkers = floodWarn.makeFloodMarkers(floodLocData, floodMarkers, map);
+        } else {
+          console.log('test mode');
+          console.log(testData[0]['sev']);
+          floodMarkers = floodWarn.makeFloodMarkers(testData, floodMarkers, map);
+          sessionStorage.clear();
+          document.write('<h1>TEST MODE ACTIVATED</h1><br>')
+        }
+
+
+        for(var i=0; i<floodMarkers.length; i++) {
+          google.maps.event.addListener(infowindow,'closeclick',function(){
+            currentMarker = null; //removes the marker
+            // then, remove the infowindows name from the array
+          });
+          google.maps.event.addListener(floodMarkers[i], 'click', function(){
+            currentMarker = this;
+            infowindow.close(); // Close previously opened infowindow
+            infowindow.setContent("<h6>Flood warning!</h6><h8>Severity level : "+this.severity+"</h8><br>"+this.message+"</p>");
+            infowindow.open(map, this);
+          });
+        }
+      }
+
+
       function initMap() {
+
+        readyPostCodeSearch();
         var xhttp = new XMLHttpRequest();
+
         xhttp.onreadystatechange = function() {
             if(this.readyState == 4 && this.status == 200) {
                 jsonData = JSON.parse(xhttp.responseText);
@@ -52,11 +198,11 @@
                         title: jsonData.mostRecentReadings[i].sensor,
                         json:jsonData.mostRecentReadings[i]
                     });
-                    
+
                     google.maps.event.addListener(infowindow,'closeclick',function(){
                         currentMarker = null; //removes the marker
                         // then, remove the infowindows name from the array
-}                   );
+                    });
                     google.maps.event.addListener(marker, 'click', function(){
                         currentSensorOpen = this.json.sensor;
                         currentMarker = this;
@@ -67,20 +213,126 @@
                     });
 
                     markers.push(marker);
-                    
+
                 }
                 //Create timer
                 timer = setInterval(updateData,300000);
+                timer = setInterval(queryFloodData,300000);
                 //Create graph
                 createGraphData();
+                if(sensorDataActive == false) {
+                sensorDataActive = true;
+                changeSensorServer();
+              }
+            } else {
+              if(sensorDataActive == true) {
+                sensorDataActive = false;
+                changeSensorServer();
+              }
             }
         };
-        xhttp.open("GET","initMap.php",true);
+        xhttp.open("GET","initMap.php",false);
         xhttp.send();
+
+        queryFloodData();
+        console.log(floodMarkers);
+      }
+
+      function setUpResponses(mockXhr) {
+
+        mockXhr.onSend = function(xhr) {
+          var response = {
+            mostRecentReadings: [
+              {
+                latitude: 52.110563540527465,
+                longditude: -2.6856254743572907,
+                sensor: 'name'
+              },
+              {
+                latitude: 51.15202212648512,
+                longditude: -3.3772074174177042,
+                sensor: 'name2'
+              }
+            ],
+            items: [
+              {
+                description: 'test data for description 1',
+                message: 'test data for message 1; red marker colour',
+                severityLevel: 4
+
+              },
+              {
+                description: 'test data for description 2',
+                message: 'test data for message 2; orange marker colour',
+                severityLevel: 3
+
+              },
+              {
+                description: 'test data for description 3',
+                message: 'test data for message 3; yellow marker colour',
+                severityLevel: 2
+
+              }
+              //  floodArea: {
+              //    lat: 52.76873028626379,
+              //    long: -2.9956780754351575
+              //  }
+            ]
+          }
+
+          var responseHeaders = {
+            'Content-Type': 'application/json',
+          }
+          xhr.respond(200, responseHeaders, JSON.stringify(response));
+        }
+
+      }
+
+      function readyPostCodeSearch() {
+        document.getElementById('search').addEventListener("click", function() {
+          if(injectionPrevent(document.getElementById('postcode').value) != "") {
+            var address = injectionPrevent(document.getElementById('postcode').value);
+            console.log(address);
+            var geocoder = new google.maps.Geocoder();
+            geocoder.geocode( { 'address': address}, function(results, status) {
+              if (status == 'OK') {
+                if(searchMarker != null) {
+                    searchMarker.setMap(null);
+                }
+                var location = results[0].geometry.location;
+                console.log(location);
+                searchMarker = new google.maps.Marker({
+                    map: map,
+                    position: results[0].geometry.location
+                });
+                map.setCenter(location);
+                map.setZoom(13);
+                if(searchCircle != null) {
+                    searchCircle.setMap(null);
+                }
+                searchCircle = new google.maps.Circle({
+                  strokeColor: '#FF0000',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 2,
+                  fillColor: '#FF0000',
+                  fillOpacity: 0.35,
+                  map: map,
+                  center: location,
+                  radius: 2000
+                });
+              } else {
+                alert('Geocode was not successful for the following reason: ' + status);
+              }
+            });
+          }
+          }, false);
         
       }
+
+
       function updateData() {
-          var xhttp = new XMLHttpRequest();
+          var xhttp = xhr;
+
           xhttp.onreadystatechange = function() {
             if(this.readyState == 4 && this.status == 200) {
                 jsonData = JSON.parse(xhttp.responseText);
@@ -90,7 +342,7 @@
                         if(markers[i].json.sensor == jsonData.mostRecentReadings[j].sensor) {
                             markers[i].json = jsonData.mostRecentReadings[j];
                         }
-                    }   
+                    }
                 }
                 //Refresh current window
                 if(currentMarker != null) {
@@ -115,13 +367,13 @@
         }
       function createGraphData() {
         var labelArray = [];
-        var seriesArray = []; 
+        var seriesArray = [];
         for(var i =0; i<jsonData.allReadings[0].readings.length;i++) {
             labelArray.push(jsonData.allReadings[0].readings[i].timestamp);
             seriesArray.push(jsonData.allReadings[0].readings[i].value);
         }
-        console.log(labelArray);
-        console.log(seriesArray);
+        //console.log(labelArray);
+        // console.log(seriesArray);
         var seriesTwo = [];
         seriesTwo.push(seriesArray);
         var data = {
@@ -132,7 +384,7 @@
       }
       function updateGraphData() {
         var labelArray = [];
-        var seriesArray = []; 
+        var seriesArray = [];
         var sensorReadings;
         if(currentSensorOpen == null) {
             sensorReadings = jsonData.allReadings[0];
@@ -148,8 +400,8 @@
             labelArray.push(sensorReadings.readings[i].timestamp);
             seriesArray.push(sensorReadings.readings[i].value);
         }
-        console.log(labelArray);
-        console.log(seriesArray);
+        // console.log(labelArray);
+        // console.log(seriesArray);
         var seriesTwo = [];
         seriesTwo.push(seriesArray);
         var data = {
@@ -158,6 +410,48 @@
         }
         new Chartist.Line('.ct-chart', data,options);
       }
+      
+      function changeFloodServer() {
+        //Gets the div that holds the flood monitoring server elements
+        var div = document.getElementById("flood_monitoring_server");
+        //Gets the element that prints the current state of the server
+        var alert = div.children[1].children[0];
+        //Changes the state printed based on whether the server is active  or not
+        if(floodServerActive) {
+          alert.innerText = "Active";
+          alert.classList.remove('alert-danger');
+          alert.classList.add('alert-success');
+        } else {
+          alert.innerText = "Unresponsive";
+          alert.classList.remove('alert-success');
+          alert.classList.add('alert-danger');
+        }
+      }
+      function changeSensorServer() {
+        //Gets the div that holds the flood monitoring server elements
+        var div = document.getElementById("sensor_dependencies");
+        //Gets the element that prints the current state of the server
+        var alert = div.children[1].children[0];
+        //Changes the state printed based on whether the server is active  or not
+        if(sensorDataActive) {
+          alert.innerText = "Active";
+          alert.classList.remove('alert-danger');
+          alert.classList.add('alert-success');
+        } else {
+          alert.innerText = "Unresponsive";
+          alert.classList.remove('alert-success');
+          alert.classList.add('alert-danger');
+        }
+      }
+
+      function injectionPrevent(string) {
+        var array = string.split("");
+        var endString = "";
+        for(var i =0; i < string.length;i++) {
+          endString += array[i].replace("'","").replace('"','').replace("(","").replace(")","").replace("*","");
+        }
+        return endString;
+      }
     </script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAjRSg_67zXcr-nx8uNPjvFgecVFj2ahxI&callback=initMap"
     async defer></script>
@@ -165,10 +459,5 @@
         <script>
             includeHTML();
         </script>
-        <!-- Optional JavaScript -->
-        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
-        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
     </body>
 </html>

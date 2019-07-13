@@ -4,11 +4,11 @@ import mysql.connector
 import base64todecimal as basetodec
 
 mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd = "root",
-    database = "FloodChecker",
-    port = 8889
+    host="dragon.kent.ac.uk",
+    user="ajh203",
+    passwd = "li3serv",
+    database = "ajh203",
+    port = 3306
 )
 
 mycursor = mydb.cursor()
@@ -25,8 +25,9 @@ params = (
 response = requests.get('https://kentwatersensors.data.thethingsnetwork.org/api/v2/query', headers=headers, params=params)
 y = json.loads(response.content)
 
-sql = "INSERT INTO data (sensor,dataValue,dataTimeStamp,dataLongitude,dataLatitude,dataHardwareSerial,dataAltitude) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+sql = "INSERT INTO SensorData (sensor,dataValue,dataTimeStamp,dataLongitude,dataLatitude,dataHardwareSerial,dataAltitude) VALUES (%s,%s,%s,%s,%s,%s,%s)"
 val = []
+
 longlat = []
 for x in y:
     if(x['device_id'] == 'lairdc0ee400001012345'):
@@ -36,7 +37,7 @@ for x in y:
 
     val.append((x['device_id'],basetodec.base64todecimal(x['raw']),x['time'].replace("T"," ").replace("Z",""),longlat['long'],longlat['lat'],longlat['hardware'],longlat['altitude']))
     print((x['device_id'],basetodec.base64todecimal(x['raw']),x['time'].replace("T"," ").replace("Z",""),longlat['long'],longlat['lat'],longlat['hardware']))
-
+mycursor.execute("DELETE FROM Data", "")
 mycursor.executemany(sql,val)
 
 mydb.commit()

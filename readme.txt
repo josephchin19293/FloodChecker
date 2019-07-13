@@ -1,0 +1,2 @@
+#Database
+Despite large amounts of attempts to install mysql using docker we eventually concluded that it was too much of a constraint, so instead we decided to use the Dragon database service the university uses. We obviously understand that due to this, the website will only be completely functional when on the university campus or using a VPN to connect to the university campus. Since a server will not be created each time all data will be deleted from the server when the seed.py script is used. Hence re entereing the data from the last 7 days to avoid duplicate data.

@@ -8,15 +8,15 @@ import mysql.connector
 
 broker="lora.kent.ac.uk"
 mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd = "root",
-    database = "FloodChecker",
-    port = 8889
+    host="dragon.kent.ac.uk",
+    user="ajh203",
+    passwd = "li3serv",
+    database = "ajh203",
+    port = 3306
 )
 
 mycursor = mydb.cursor()
-sql = "INSERT INTO data (sensor,dataValue,dataTimeStamp,dataLongitude,dataLatitude,dataHardwareSerial,dataAltitude) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+sql = "INSERT INTO SensorData (sensor,dataValue,dataTimeStamp,dataLongitude,dataLatitude,dataHardwareSerial,dataAltitude) VALUES (%s,%s,%s,%s,%s,%s,%s)"
 
 #define callback
 def on_message(client, userdata, message):
